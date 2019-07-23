@@ -44,9 +44,11 @@ class packet_obj():
     def __str__(self):
         s = ["%02X"%b for b in self.packetdata]
         return self.codename+":"+(" ".join(s))
-    def initdat(self):
+    def findcode(self,code):
         for k,v in cmdict.items():
-            datdict[v['CODE']]={'NAME':k,'TYPE':v['TYPE'],'DESC':v['DESC']}
+            if v['CODE']==code:
+                return (k,v['TYPE'],v['DESC'])
+        return ('','','')
     def encode(self,code,seq,data=None):
         checksum , data_len = 0 , 0 if data is None else len(data)
         length = bytes([4+data_len])
@@ -84,7 +86,7 @@ class packet_obj():
         if pac[0:2]!=PACKET_HEAD or pac[-2:]!=PACKET_TAIL or len(pac)<8:
             return self.data
         length,seq,code=pac[2],pac[3],"%02X"%pac[4]
-        desc, name, type= datdict[code]['DESC'],datdict[code]['NAME'],datdict[code]['TYPE']
+        (name,type,desc) = self.findcode(code)
         varr=[]
         if type=="2":
             if len(pac)!=10:
@@ -126,12 +128,11 @@ class packet_obj():
                 varr.append(pac[5])
                 varr.append(int.from_bytes(pac[6:8],  byteorder='little', signed=True))
                 varr.append(int.from_bytes(pac[8:10], byteorder='little', signed=True))
-        self.data={name:{'CODE':code,'SEQ':seq,'TYPE':type,'DESC':desc,'VALUE':varr}}
+        self.data={'NAME':name,'CODE':code,'SEQ':seq,'TYPE':type,'DESC':desc,'VALUE':varr}
         return self.data
 
 if __name__ == "__main__":
     k=packet_obj()
-    k.initdat()
     pac=k.compose_cmd("VOUT",[120])
     print(k)
     pj=k.parse_packet(pac)

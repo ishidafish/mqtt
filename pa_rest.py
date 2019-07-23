@@ -17,20 +17,20 @@ async def index(request):
 async def pub(request):
     pac = pa_packet.packet_obj()
     try:
-        topic = request.query['topic']
+        topic = request.query['topic'] 
+        topic = topic.replace('.','/')
         cmd = request.query['cmd']
         data = request.query['data'] if request.query.__contains__('data') else []
         data_array=json.loads(data)
         message=pac.compose_cmd(cmd,data_array)
         pahopublish.single(
-            topic=conf.SUB_TOPIC,
+            topic=conf.SUB_TOPIC+'/'+topic, # prefix = conf.SUB_TOPIC
             payload=message, 
             qos = conf.QoS, 
             hostname=conf.HOST, 
             port=conf.PORT, 
             auth = {'username':conf.USER, 'password':conf.PASS})
-        pac=None
-        return web.Response(text=topic+":"+cmd+", "+data)
+        return web.Response(text=conf.SUB_TOPIC+'/'+topic+":"+cmd+", "+data)
     except:
         pac=None
         return web.Response(text="参数不对,ex: pub?topic=mytopic&cmd=SETM&data=[0]")

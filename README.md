@@ -5,14 +5,14 @@
 1. Python 3<br>
   require:<br>
 ```
-    aiohttp==3.5.4<br>
-    mysql-connector-python==8.0.17<br>
-    paho-mqtt==1.4.0<br>
+    aiohttp==3.5.4
+    mysql-connector-python==8.0.17
+    paho-mqtt==1.4.0
 ```
 2. MySQL<br>
-```bash
-  $ brew install mysql<br> or
-  $ apt-get install mysql-server<br>...
+```
+  $ brew install mysql or
+  $ apt-get install mysql-server...
   $ mysql.server start
   $ sudo mysql
   mysql> create user 'iot'@localhost identified by 'iot';

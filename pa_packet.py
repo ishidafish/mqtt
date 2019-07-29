@@ -16,14 +16,14 @@ cmdict={
     "GETL":{"CODE":'08',"TYPE":"1,1","DESC":"查询锁的状态"}, # 1+1 通道+锁状态
     "SETL":{"CODE":'09',"TYPE":"1,1","DESC":"控制开锁动作"}, # 1+1 通道+锁动作
     "BIND":{"CODE":'0A',"TYPE":"1,1","DESC":"绑定风扇和温度控制"}, # 1+1 风扇通道+温度通道
-    "LOG_":{"CODE":'0B',"TYPE":"0,N","DESC":"终端日志获取"}, # 0 
-    "GPS_":{"CODE":'0C',"TYPE":"0,N","DESC":"GPS定位经纬度信息"}, # 0 DDDDDddddNDDDDDddddE
+    "LOG_":{"CODE":'0B',"TYPE":"0,-1","DESC":"终端日志获取"}, # 0 
+    "GPS_":{"CODE":'0C',"TYPE":"0,-1","DESC":"GPS定位经纬度信息"}, # 0 DDDDDddddNDDDDDddddE
     "TCOM":{"CODE":'0D',"TYPE":"2","DESC":"通信时间间隔(sec)"}, # 2 
     "TSEN":{"CODE":'0E',"TYPE":"2","DESC":"数据采集唤醒间隔(sec)"}, # 2 
     "VBAT":{"CODE":'0F',"TYPE":"2","DESC":"电池电压与电量(mV)"}, # 2 
     "VOUT":{"CODE":'10',"TYPE":"2","DESC":"外来电压(mV)"}, # 2
     "SIGN":{"CODE":'11',"TYPE":"1","DESC":"通信信号强度(0~31)"}, # 1
-    "CIMI":{"CODE":'12',"TYPE":"0,N","DESC":"SIM卡CIMI码"}, # 0
+    "CIMI":{"CODE":'12',"TYPE":"0,-1","DESC":"SIM卡CIMI码"}, # 0
     "FXMA":{"CODE":'13',"TYPE":"2","DESC":"风扇最大的工作电流(mA)"}, # 2
     "DOWA":{"CODE":'14',"TYPE":"2","DESC":"舱门开启告警时间设定(sec)"}, # 2
     "TWAR":{"CODE":'15',"TYPE":"1,2","DESC":"温度通道告警设置(°C)"}, # 1 + 2 通道+温度
@@ -36,6 +36,9 @@ cmdict={
     }
 
 datdict={}
+for k,v in cmdict.items():
+    datdict[v['CODE']]={'NAME':k,'TYPE':v['TYPE'],'DESC':v['DESC']}
+
 class packet_obj():
     def __init__(self,seq=0, head=PACKET_HEAD, tail=PACKET_TAIL):
         global datdict,cmdict
@@ -45,10 +48,17 @@ class packet_obj():
         s = ["%02X"%b for b in self.packetdata]
         return self.codename+":"+(" ".join(s))
     def findcode(self,code):
+        try:
+            r=datdict[code]
+            return (r['NAME'],r['TYPE'],r['DESC'])
+        except:
+            return ('','','')   
+        ''' 
         for k,v in cmdict.items():
             if v['CODE']==code:
                 return (k,v['TYPE'],v['DESC'])
         return ('','','')
+        '''
     def encode(self,code,seq,data=None):
         checksum , data_len = 0 , 0 if data is None else len(data)
         length = bytes([4+data_len])
@@ -56,10 +66,11 @@ class packet_obj():
         if data_len>0: dummy = dummy + data
         for b in dummy: checksum ^= b
         return self.head+ dummy + bytes([checksum])+ self.tail
-    def compose_cmd(self,codename,data=[]):
+    def compose_cmd(self,codename,seq=-1, data=[]):
         global cmdict
         self.codename=codename
-        p_seq = struct.pack("B", self.seq %256)
+        _seq = self.seq if seq == -1 else seq
+        p_seq = struct.pack("B", _seq % 256)
         p_code= struct.pack("B",int(cmdict[codename]["CODE"],16))
         p_type = cmdict[codename]["TYPE"]
         self.seq += 1
@@ -77,8 +88,10 @@ class packet_obj():
             p_data=struct.pack("B",data[0])+struct.pack("<h",data[1])+struct.pack("<h",data[2])
         elif p_type=='1,1':
             p_data=struct.pack("B",data[0])+struct.pack("B",data[1])
-        elif p_type=='0' or p_type=='0,N':
+        elif p_type=='0':
             p_data=bytes()
+        elif p_type=='0,-1':
+            p_data=data[0].encode('utf8')
         self.packetdata=self.encode(p_code,p_seq,p_data)
         return self.packetdata
     def parse_packet(self,pac): # length + seq + code + data
@@ -87,82 +100,38 @@ class packet_obj():
             return self.data
         length,seq,code=pac[2],pac[3],"%02X"%pac[4]
         (name,type,desc) = self.findcode(code)
+        lsum=sum([int(x) for x in type.split(',')])
+        self.data={'NAME':name,'CODE':code,'SEQ':seq,'TYPE':type,'DESC':desc,'VALUE':[]}
+        if lsum <= 0:
+            pass
+        elif lsum+8 != len(pac):
+            return self.data
         varr=[]
         if type=="2":
-            if len(pac)!=10:
-                return self.data
-            else:
-                varr.append(int.from_bytes(pac[5:7], byteorder='little', signed=True))
+            varr.append(int.from_bytes(pac[5:7], byteorder='little', signed=True))
         elif type=="1,1":
-            if len(pac)!=10:
-                return self.data
-            else:
-                varr.append(pac[5])
-                varr.append(pac[6])
+            varr.append(pac[5])
+            varr.append(pac[6])
         elif type=="1":
-            if len(pac)!=9:
-                return self.data
-            else:
-                varr.append(pac[5])
+            varr.append(pac[5])
         elif type=="7":
-            if len(pac)!=15:
-                return self.data
-            else:
-                varr.append(int.from_bytes(pac[5:7], byteorder='little', signed=True))
-                for i in range(0,5):
-                    varr.append(pac[i+7])
+            varr.append(int.from_bytes(pac[5:7], byteorder='little', signed=True))
+            for i in range(0,5):
+                varr.append(pac[i+7])
         elif type=="0":
             pass
-        elif type=="0,N":
-            varr.append(''.join(chr(b) for b in pac[5:(length+1)]))
+        elif type=="0,-1":
+            #varr.append(''.join(chr(b) for b in pac[5:(length+1)]))
+            varr.append(pac[5:(length+1)])
         elif type=="1,2":
-            if len(pac)!=11:
-                return self.data
-            else:
-                varr.append(pac[5])
-                varr.append(int.from_bytes(pac[6:8], byteorder='little', signed=True))
+            varr.append(pac[5])
+            varr.append(int.from_bytes(pac[6:8], byteorder='little', signed=True))
         elif type=="1,2,2":
-            if len(pac)!=13:
-                return self.data
-            else:
-                varr.append(pac[5])
-                varr.append(int.from_bytes(pac[6:8],  byteorder='little', signed=True))
-                varr.append(int.from_bytes(pac[8:10], byteorder='little', signed=True))
+            varr.append(pac[5])
+            varr.append(int.from_bytes(pac[6:8],  byteorder='little', signed=True))
+            varr.append(int.from_bytes(pac[8:10], byteorder='little', signed=True))
         self.data={'NAME':name,'CODE':code,'SEQ':seq,'TYPE':type,'DESC':desc,'VALUE':varr}
         return self.data
 
 if __name__ == "__main__":
-    k=packet_obj()
-    pac=k.compose_cmd("VOUT",[120])
-    print(k)
-    pj=k.parse_packet(pac)
-    print(json.dumps(pj, ensure_ascii=False,indent=1))
-
-    pac=k.compose_cmd("SETF",[1,10])
-    print(k)
-    pj=k.parse_packet(pac)
-    print(json.dumps(pj, ensure_ascii=False,indent=1))
-
-    pac=k.compose_cmd("SETM",[1])
-    print(k)
-    pj=k.parse_packet(pac)
-    print(json.dumps(pj, ensure_ascii=False,indent=1))
-
-    pac=k.compose_cmd("TSYN",[])
-    print(k)
-    pj=k.parse_packet(pac)
-    print(json.dumps(pj, ensure_ascii=False,indent=1))
-    
-    cc=b'\x55\x8A\x0B\x01\x0B\x41\x42\x61\x62\x63\x21\x39\xD5\xFE\xAA'
-    pj=k.parse_packet(cc)
-    print(json.dumps(pj, ensure_ascii=False,indent=1))
-
-    pac=k.compose_cmd("GETT",[1,-230])
-    print(k)
-    pj=k.parse_packet(pac)
-    print(json.dumps(pj, ensure_ascii=False,indent=1))
-
-    pac=k.compose_cmd("SETT",[1,-230,300])
-    print(k)
-    pj=k.parse_packet(pac)
-    print(json.dumps(pj, ensure_ascii=False,indent=1))
+    pass

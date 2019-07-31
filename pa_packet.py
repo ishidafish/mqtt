@@ -106,30 +106,33 @@ class packet_obj():
             pass
         elif lsum+8 != len(pac):
             return self.data
-        varr=[]
-        if type=="2":
-            varr.append(int.from_bytes(pac[5:7], byteorder='little', signed=True))
-        elif type=="1,1":
-            varr.append(pac[5])
-            varr.append(pac[6])
-        elif type=="1":
-            varr.append(pac[5])
-        elif type=="7":
-            varr.append(int.from_bytes(pac[5:7], byteorder='little', signed=True))
-            for i in range(0,5):
-                varr.append(pac[i+7])
-        elif type=="0":
+        try:
+            varr=[]
+            if type=="2":
+                varr.append(int.from_bytes(pac[5:7], byteorder='little', signed=True))
+            elif type=="1,1":
+                varr.append(pac[5])
+                varr.append(pac[6])
+            elif type=="1":
+                varr.append(pac[5])
+            elif type=="7":
+                varr.append(int.from_bytes(pac[5:7], byteorder='little', signed=True))
+                for i in range(0,5):
+                    varr.append(pac[i+7])
+            elif type=="0":
+                pass
+            elif type=="0,-1":
+                #varr.append(''.join(chr(b) for b in pac[5:(length+1)]))
+                varr.append(pac[5:(length+1)])
+            elif type=="1,2":
+                varr.append(pac[5])
+                varr.append(int.from_bytes(pac[6:8], byteorder='little', signed=True))
+            elif type=="1,2,2":
+                varr.append(pac[5])
+                varr.append(int.from_bytes(pac[6:8],  byteorder='little', signed=True))
+                varr.append(int.from_bytes(pac[8:10], byteorder='little', signed=True))
+        except:
             pass
-        elif type=="0,-1":
-            #varr.append(''.join(chr(b) for b in pac[5:(length+1)]))
-            varr.append(pac[5:(length+1)])
-        elif type=="1,2":
-            varr.append(pac[5])
-            varr.append(int.from_bytes(pac[6:8], byteorder='little', signed=True))
-        elif type=="1,2,2":
-            varr.append(pac[5])
-            varr.append(int.from_bytes(pac[6:8],  byteorder='little', signed=True))
-            varr.append(int.from_bytes(pac[8:10], byteorder='little', signed=True))
         self.data={'NAME':name,'CODE':code,'SEQ':seq,'TYPE':type,'DESC':desc,'VALUE':varr}
         return self.data
 

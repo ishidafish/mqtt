@@ -50,7 +50,7 @@ async def cmd(request):
     return web.Response(text=msg)
 
 @routes.get('/query/{sqlname}')
-@routes.get('/query/{sqlname}/{param}')
+#@routes.get('/query/{sqlname}/{param}')
 async def query(request):
     try:
         print(request.match_info)
@@ -60,7 +60,7 @@ async def query(request):
         cursor.execute(sql)
         results = cursor.fetchall()
         result_array=[]
-        for row in results:
+        for row in results:  # 也许要加 csv的方式
             result_array.append(mapdict(cursor.column_names, row))
         cursor.close()
         return web.Response(text=json.dumps(result_array, ensure_ascii=False,indent=2))

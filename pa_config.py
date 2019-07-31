@@ -17,7 +17,8 @@ MUST_REPLY_CODES = ('01','02',)
 GET_SQL={
     "add_trandata":("INSERT INTO `pabox`.`trandata`(`imei`,`code`,`code_name`,`seq`,`attr01`,`desc`,`data`) VALUES (%s, %s, %s, %s, %s, %s, %s)"),
     "trandata":("SELECT * from `pabox`.`trandata` order by `line_id` desc limit 100"),
-    "item":("SELECT * from `pabox`.`item` limit 100"),
+    "item":("SELECT * from `pabox`.`item`"),
+    "code_detail":("SELECT * from `pabox`.`code_detail`"),
     }
 
 

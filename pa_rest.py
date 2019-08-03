@@ -32,7 +32,11 @@ async def pub(request):
             data_array = []
         message = pac.compose_cmd(cmd,-1,data_array)
         if topic[0:1]=='_': # conf.SUB_TOPIC
-            topic = conf.SUB_TOPIC+'/' + topic[1:]            
+            topic = conf.SUB_TOPIC+'/' + topic[1:]
+
+
+
+        # multiple                
         pahopublish.single(topic= topic, payload=message, qos = conf.QoS, hostname=conf.HOST, port=conf.PORT, auth = {'username':conf.USER, 'password':conf.PASS})
     except:
         pac=None

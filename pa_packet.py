@@ -33,6 +33,7 @@ cmdict={
     "DOTI":{"CODE":'83',"TYPE":"2","DESC":"舱门开启动作(sec)"}, # 2 
     "VOVA":{"CODE":'84',"TYPE":"2","DESC":"外供电开始(mV)"}, # 2 mV
     "T_AL":{"CODE":'85',"TYPE":"1,2","DESC":"箱体温度告警(°C)"}, # 1+2 温度*10
+    "_ON_":{"CODE":'F0',"TYPE":"7","DESC":"数控启动"},  # 7 year_2+mon_1+mday_1+hour_1+min_1+sec_1, 7bytes
     }
 
 datdict={}
@@ -137,4 +138,4 @@ class packet_obj():
         return self.data
 
 if __name__ == "__main__":
-    pass
+    print(str(datdict))

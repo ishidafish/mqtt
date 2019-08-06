@@ -21,7 +21,7 @@ async def index(request):
 async def pub(request):
     global seq
     seq += 1
-    pac = pa_packet.packet_obj(seq=seq)
+    pac = pa_packet.Tpacket()
     try:
         topic = request.query['topic'] 
         topic = topic.replace('.','/')
@@ -30,7 +30,7 @@ async def pub(request):
             data_array = json.loads(request.query['data'])
         else:
             data_array = []
-        message = pac.compose_cmd(cmd,-1,data_array)
+        message = pac.compose(cmd,seq,data_array)
         if topic[0:1]=='_': # conf.SUB_TOPIC
             topic = conf.SUB_TOPIC+'/' + topic[1:]
 

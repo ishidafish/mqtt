@@ -11,7 +11,7 @@ MY_PASS = "iot"
 MY_DATABASE ="pabox"
 
 # Subscribe 的 Topics
-TOPICS = [SUB_TOPIC,]
+TOPICS = [SUB_TOPIC]
 # 订阅得到的msg.code ,设定发布回去的code及内容
 MUST_REPLY_CODES = {
     '01':{"01" : -10},    # 原值
@@ -32,7 +32,7 @@ GET_SQL={
     "add_trandata":("INSERT INTO `pabox`.`trandata`(`imei`,`code`,`code_name`,`seq`,`attr01`,`desc`,`data`) VALUES (%s, %s, %s, %s, %s, %s, %s)"),
     "trandata":("SELECT * from `pabox`.`trandata` order by `line_id` desc limit 100"),
     "item":("SELECT * from `pabox`.`item`"),
-    "item_attr":("SELECT attr01,attr02,attr03,attr04,attr05,attr06,attr07,attr08 from `pabox`.`item` where imei= %s "),
+    "item_attr":("SELECT attr01,attr02,attr03,attr04,attr05,attr06,attr07,attr08 from `pabox`.`item` where `imei`= %s"),
     "item_clear":("Update `pabox`.`item` set `attr01`='' WHERE `imei`= %s "),
     "item_on":("Update `pabox`.`item` set `on_time`= now() WHERE `imei` = %s "),
     }
@@ -52,6 +52,7 @@ attr01 DIRTY_FLAG
 '''
 
 logo='''
+___________________________________________________________
  _______  __   __  ___   _  __   __  _______  __   __  ___  
 |       ||  | |  ||   | | ||  | |  ||       ||  | |  ||   | 
 |    ___||  | |  ||   |_| ||  | |  ||  _____||  |_|  ||   | 
@@ -59,4 +60,5 @@ logo='''
 |    ___||       ||     |_ |       ||_____  ||       ||   | 
 |   |    |       ||    _  ||       | _____| ||   _   ||   | 
 |___|    |_______||___| |_||_______||_______||__| |__||___| 
+-----------------------------------------------------------
 '''

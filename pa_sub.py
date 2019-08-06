@@ -14,27 +14,22 @@ def on_connect(client, userdata, flags, rc):
         print("订阅:%s/#"%(t,))
 
 def on_message(client, userdata, msg):
-    t=threading.Thread(target=my_on_message, args=(msg,))
-    t.start()
-
-def my_on_message(msg):
-    pac = pa_packet.packet_obj()
+    pac = pa_packet.Tpacket()
     cursor = cnx.cursor()
     now=time.strftime("%Y-%m-%d %X", time.localtime())
-    # pacobj={'NAME':__,'CODE':__,'SEQ':__,'TYPE':__,'DESC':__,'VALUE':[__]}
-    pacobj = pac.parse_packet(msg.payload)
+    # pdata={'NAME':__,'CODE':__,'SEQ':__,'TYPE':__,'DESC':__,'VALUE':[__]}
+    pdata = pac.parse(msg.payload)
     topic = msg.topic
     topic_array = topic.split('/')
     iid = topic_array[1]  # 假設 iid 為 IMEI
-    print(now +':'+msg.topic+'='+str(pacobj)) 
-    r = (iid, pacobj['CODE'], pacobj['NAME'], pacobj['SEQ'],  pacobj['TYPE'], pacobj['DESC'], str(pacobj['VALUE']))
+    print(now +':'+msg.topic+'='+str(pdata)) 
+    r = (iid, pdata['CODE'], pdata['NAME'], pdata['SEQ'],  pdata['TYPE'], pdata['DESC'], str(pdata['VALUE']))
     cursor.execute(conf.GET_SQL['add_trandata'], r)  # DB
     cnx.commit()
     cursor.execute(conf.GET_SQL['item_attr'], (iid,)) # 每次收到message 都检查 item dirty, item.attr01
     item_row = cursor.fetchone()
-    now = time.strftime("%Y-%m-%d %X", time.localtime())
     try:
-        org_code = pacobj['CODE']
+        org_code = pdata['CODE']
         rA=conf.MUST_REPLY_CODES[org_code]
     except:
         rA = {}
@@ -50,19 +45,16 @@ def my_on_message(msg):
         for k,v in reply_codes.items():
             if i>0:
                 time.sleep(1)  # ***
-            t = pa_packet.datdict[k]
-            pacobj['CODE'] = k
-            pacobj['NAME'] = t['NAME'] 
-            pacobj['TYPE'] = t['TYPE'] 
-            pacobj['DESC'] = t['DESC']
+            t = pa_packet.codeDict[k]
+            pdata['CODE'],pdata['NAME'],pdata['TYPE'],pdata['DESC']=k,t['NAME'],t['TYPE'],t['DESC']
             if v > 0:
                 val_arr = json.loads(item_row[v])   # item_row[position]
                 v_str = str(val_arr)
             elif v == -1:
                 val_arr, v_str = [] , now
             elif v == -10:
-                val_arr, v_str =  pacobj['VALUE'],str(pacobj['VALUE'])
-            tdata(cursor, pac, iid, pacobj, val_arr, v_str)
+                val_arr, v_str =  pdata['VALUE'],str(pdata['VALUE'])        
+            tdata(cursor, pac, iid, pdata, val_arr, v_str)
             i += 1
     except:
         pass
@@ -70,12 +62,13 @@ def my_on_message(msg):
     cursor.close()
 
 def tdata(cursor, pac, iid, pacobj, val_arr, v_str):
-    msg_back = pac.compose_cmd(pacobj['NAME'], pacobj['SEQ'], val_arr)
+    msg_back = pac.compose(pacobj['CODE'], pacobj['SEQ'], val_arr)
     r1 = (iid, pacobj['CODE'], pacobj['NAME'], pacobj['SEQ'], pacobj['TYPE'], '[R]:'+pacobj['DESC'], v_str)
     client.publish(iid, msg_back, conf.QoS)
     cursor.execute(conf.GET_SQL['add_trandata'], r1)
     cnx.commit()
     print(time.strftime("%Y-%m-%d %X", time.localtime()) + ":Reply_Publish:"+iid+'/'+pacobj['CODE']+"+"+v_str)
+    # time.sleep(1)
 
 def joindict(dict1, dict2):
     dictX=dict1
@@ -90,7 +83,6 @@ def joindict(dict1, dict2):
 # Start Here
 cnx = mysql.connector.connect(host=conf.MY_HOST, user=conf.MY_USER, passwd=conf.MY_PASS, database=conf.MY_DATABASE)
 cnx.ping(True)
-add_info = conf.GET_SQL['add_trandata']
 client = mqtt.Client()
 client.username_pw_set(conf.USER, conf.PASS)
 client.on_connect = on_connect

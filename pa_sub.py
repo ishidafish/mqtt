@@ -17,8 +17,7 @@ def on_message(client, userdata, msg):
     pac = pa_packet.Tpacket()
     cursor = cnx.cursor()
     now=time.strftime("%Y-%m-%d %X", time.localtime())
-    # pdata={'NAME':__,'CODE':__,'SEQ':__,'TYPE':__,'DESC':__,'VALUE':[__]}
-    pdata = pac.parse(msg.payload)
+    pdata = pac.parse(msg.payload) # pdata={'NAME':__,'CODE':__,'SEQ':__,'TYPE':__,'DESC':__,'VALUE':[__]}
     topic = msg.topic
     topic_array = topic.split('/')
     iid = topic_array[1]  # 假設 iid 為 IMEI
@@ -39,36 +38,33 @@ def on_message(client, userdata, msg):
         rB=conf.MUST_REPLY_CODES["DIRTY"] if org_code !="F0" else {}
     else:
         rB = {}
-    reply_codes = joindict(rA,rB)
+    reply_codes = joindict(rA,rB) #{"02" : -1,"05" : 1,"13" : 2,"14" : 3,"15" : 4,"09" : 5,"0D" : 6,"0E" : 7,}
     try:
-        i=0
+        i, _data, _vstr = 0, bytes(), ''
         for k,v in reply_codes.items():
-            if i>0:
-                time.sleep(1)  # ***
             t = pa_packet.codeDict[k]
-            pdata['CODE'],pdata['NAME'],pdata['TYPE'],pdata['DESC']=k,t['NAME'],t['TYPE'],t['DESC']
             if v > 0:
                 val_arr = json.loads(item_row[v])   # item_row[position]
                 v_str = str(val_arr)
             elif v == -1:
-                val_arr, v_str = [] , now
+                val_arr, v_str = [] , "['"+now+"']"
             elif v == -10:
                 val_arr, v_str =  pdata['VALUE'],str(pdata['VALUE'])        
-            tdata(cursor, pac, iid, pdata, val_arr, v_str)
+            msg_back = pac.compose(k, pdata['SEQ'], val_arr)
+            _data = _data + pac.p_data # binary data 
+            _vstr = _vstr + ('' if i==0 else ',') + v_str
             i += 1
+        msg_back = pac.join( k ,pdata['SEQ'] , _data)
+        r1 = (iid, org_code, pdata['NAME'], pdata['SEQ'], pdata['TYPE'], '[R]:'+pdata['DESC'], _vstr)
+        client.publish(iid, msg_back, conf.QoS)
+        cursor.execute(conf.GET_SQL['add_trandata'], r1)
+        cnx.commit()
+        print(time.strftime("%Y-%m-%d %X", time.localtime()) + ":Reply_Publish:"+iid+'/'+ org_code +"+"+ _vstr)
+        i += 1
     except:
         pass
     pac = None
     cursor.close()
-
-def tdata(cursor, pac, iid, pacobj, val_arr, v_str):
-    msg_back = pac.compose(pacobj['CODE'], pacobj['SEQ'], val_arr)
-    r1 = (iid, pacobj['CODE'], pacobj['NAME'], pacobj['SEQ'], pacobj['TYPE'], '[R]:'+pacobj['DESC'], v_str)
-    client.publish(iid, msg_back, conf.QoS)
-    cursor.execute(conf.GET_SQL['add_trandata'], r1)
-    cnx.commit()
-    print(time.strftime("%Y-%m-%d %X", time.localtime()) + ":Reply_Publish:"+iid+'/'+pacobj['CODE']+"+"+v_str)
-    # time.sleep(1)
 
 def joindict(dict1, dict2):
     dictX=dict1
@@ -91,7 +87,3 @@ client.connect(conf.HOST, conf.PORT, 60)
 print(conf.logo)
 client.loop_forever()
 cnx.close()
-
-
-# "[b'123']" ::: bytes.decode(eval(b)[0])  ::: '123'
-# $IME 下行, PABOX/$IME 上行

@@ -43,8 +43,17 @@ class Tpacket():
     def __str__(self):
         s = ["%02X"%b for b in self.bindata]
         return (" ".join(s))
+    def join(self,code,seq,data): # length + seq + code + data + chk
+        p_seq_code = struct.pack("2B", seq % 256, int(code,16))
+        checksum , p_data_len = 0 , 0 if data is None else len(data)
+        dummy = bytes([4+p_data_len]) + p_seq_code + data if p_data_len>0 else bytes([])
+        for b in dummy: checksum ^= b
+        self.bindata=self.head+ dummy + bytes([checksum])+ self.tail
+        return self.bindata
+
     def compose(self,code,seq=-1, data=[]):
         global codeDict
+        self.p_data=bytes()
         _seq = self.seq if seq == -1 else seq
         p_seq_code = struct.pack("2B", _seq % 256, int(code,16))
         p_type = codeDict[code]["TYPE"]
@@ -66,6 +75,7 @@ class Tpacket():
             p_data=bytes()
         elif p_type=='0,-1':
             p_data=data[0].encode('utf8')
+        self.p_data=p_data
         checksum , p_data_len = 0 , 0 if data is None else len(p_data)
         dummy = bytes([4+p_data_len]) + p_seq_code + p_data if p_data_len>0 else bytes([])
         for b in dummy: checksum ^= b
@@ -92,13 +102,15 @@ class Tpacket():
             elif tt=="1":
                 varr.append(pac[5])
             elif tt=="7":
-                varr.append(int.from_bytes(pac[5:7], byteorder='little', signed=True))
+                q=[]
+                q.append(int.from_bytes(pac[5:7], byteorder='little', signed=True))
                 for i in range(0,5):
-                    varr.append(pac[i+7])
+                    q.append(pac[i+7])
+                varr.append("%4d-%02d-%02d %02d:%02d:%02d"%(q[0],q[1],q[2],q[3],q[4],q[5]))
             elif tt=="0":
                 pass
             elif tt=="0,-1":
-                varr.append(pac[5:(length+1)])
+                varr.append(pac[5:(length+1)]) # bytes
             elif tt=="1,2":
                 varr.append(pac[5])
                 varr.append(int.from_bytes(pac[6:8], byteorder='little', signed=True))
@@ -108,26 +120,46 @@ class Tpacket():
                 varr.append(int.from_bytes(pac[8:10], byteorder='little', signed=True))
         except:
             pass
+        else:
+            if code=='0B':  # 有 12 跟 18個 資料的區別
+                varr=parse_mix(varr[0])
         self.data['VALUE']=varr
         return self.data
 
-if __name__ == "__main__":
-    import json
-    pac=Tpacket()
-    bindata = pac.compose("02",-1,[])
-    print(pac)
-    pac.parse(bindata)
-    print(pac.data)
+def parse_mix(mdata):
+    q, retval = [], {}
+    q.append(int.from_bytes(mdata[0:2], byteorder='little', signed=True))
+    for i in range(0,5):
+        q.append(mdata[i+2])
+    retval['TIME'] = "%4d-%02d-%02d %02d:%02d:%02d"%(q[0],q[1],q[2],q[3],q[4],q[5])
+    retval['GPSV'] = mdata[ 7:28].decode() 
+    retval['GPST'] = mdata[28:29].decode()
+    retval['TEMP'] = int.from_bytes(mdata[29:31], byteorder='little', signed=True)
+    q=[]
+    q.append(mdata[31])
+    q.append(int.from_bytes(mdata[32:34], byteorder='little', signed=True))
+    q.append(int.from_bytes(mdata[34:36], byteorder='little', signed=True))
+    retval['TRHG'] = q
+    retval['VPST'] = mdata[36]
+    retval['VOLT'] = int.from_bytes(mdata[37:39], byteorder='little', signed=True)
+    retval['FPST'] = mdata[39]
+    retval['F_MA'] = int.from_bytes(mdata[40:42], byteorder='little', signed=True)
+    retval['LOCK'] = mdata[42]
+    retval['SIGT'] = mdata[43]
+    retval['SIGV'] = int.from_bytes(mdata[44:46], byteorder='little', signed=True)
+    try:
+        retval['DOAL'] = int.from_bytes(mdata[46:48], byteorder='little', signed=True)
+        retval['TCOM'] = mdata[48]
+        retval['TLOG'] = mdata[49]
+        retval['TGPS'] = mdata[50]
+        retval['TTMP'] = mdata[51]
+        q=[]
+        q.append(int.from_bytes(mdata[52:54], byteorder='little', signed=True))
+        q.append(int.from_bytes(mdata[54:56], byteorder='little', signed=True))
+        retval['VERN']=q    
+        retval['TYPE']='定時監控'
+    except:
+        retval['TYPE']='事件紀錄'
 
-    bindata = pac.compose("05",-1,[1,-200,300])
-    print(pac)
-    pac.parse(bindata)
-    print(pac.data)
-    bindata = pac.compose("07",-1,[1,2])
-    print(pac)
-    pac.parse(bindata)
-    print(pac.data)
-    '''
-    pj=k.parse_packet(pac)
-    print(json.dumps(pj, ensure_ascii=False,indent=1))
-'''
+if __name__ == "__main__":
+    pass

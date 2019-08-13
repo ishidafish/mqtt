@@ -40,7 +40,7 @@ async def pub(request):
         pahopublish.single(topic= topic, payload=message, qos = conf.QoS, hostname=conf.HOST, port=conf.PORT, auth = {'username':conf.USER, 'password':conf.PASS})
     except:
         pac=None
-        return web.Response(text="参数不对,ex: pub?topic=[_]mytopic&cmd=SETM&data=[0]")
+        return web.Response(text="参数不对,ex: pub?topic=[_]IMEI&cmd=00&data=[0]")
     else:
         pac=None
         now=time.strftime("%Y-%m-%d %X", time.localtime())
